@@ -15,7 +15,6 @@ bot = Bot(token=os.environ['BOT_TOKEN'])
 storage = MemoryStorage()
 dp = Dispatcher(bot, storage=storage)
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.ERROR)
 
 conn = psycopg2.connect(
         host=os.environ['POSTGRES_HOST'],
@@ -92,7 +91,8 @@ class User(StatesGroup):
 @dp.message_handler(commands=['start'])
 async def start_command(message: types.Message):
     user_id, user_name = message.from_user.id, message.from_user.username
-    await message.answer("Привет! Я бот-хранитель паролей. Вы можете использовать меня, чтобы хранить пароли для различных сервисов. Для начала напишите /help, чтобы узнать больше.")
+    await message.answer('''Привет! Я бот-хранитель паролей. Вы можете использовать меня, 
+                         чтобы хранить пароли для различных сервисов. Для начала напишите /help, чтобы узнать больше.''')
     await create_DB(f"{user_name}_{user_id}")
     cursor.execute("INSERT INTO Users (id, username) VALUES(%s, %s) "
                    "ON CONFLICT (id) DO UPDATE SET id=%s, username=%s", (user_id, user_name, user_id, user_name))
@@ -120,11 +120,11 @@ async def get_request_password(message: types.Message, state: FSMContext):
             await message.answer("нажмите на нужный номер")
             await User.waiting_for_get_service.set()
         else:
-            await message.answer("У вас нет сохраненных паролей. Нажмите /set, чтобы зарегистрировать сервис с паролем.")
+            await message.answer("У вас нет сохраненных паролей. Нажмите /set, чтобы записать сервис.")
             await User.waiting_for_command.set()
     except Exception as e:
         logging.error(f"Ошибка при выполнении функции get_request_password: {e}")
-        await message.answer("Произошла ошибка при выполнении команды /get")
+        await message.answer("Произошла ошибка при выполнении команды /get.\nНажмите /help, чтобы узнать способности этого бота ")
         await User.waiting_for_command.set()
 
 
@@ -137,7 +137,7 @@ async def get_password(message: types.Message, state: FSMContext):
         id = int(id)
     except Exception as e:
         logger.exception(f"Ошибка от {user_name} - {user_id}")
-        await message.answer("Произошла ошибка при выполнении команды. Попробуйте снова позже.")
+        await message.answer("Произошла ошибка при выполнении команды.\nНажмите /help, чтобы узнать способности этого бота")
     else:
         data = await select_service(table, user_id, id)
         if data is not None and len(data) != 0:
@@ -150,7 +150,7 @@ async def get_password(message: types.Message, state: FSMContext):
             await bot.delete_message(chat_id=user_id, message_id=message_id)
             await bot.delete_message(chat_id=user_id, message_id=message_id_2)
         else:
-            await message.answer("Неверно набран сервис. Нажмите /get чтобы запросить снова")
+            await message.answer("Неверно набран сервис. Нажмите /get чтобы запросить доступные сервисы")
     finally:
         await User.waiting_for_command.set()
 
@@ -230,13 +230,12 @@ async def del_request_password(message: types.Message, state: FSMContext):
             await message.answer("Нажмите на номер сервиса, который хотите удалить")
             await User.waiting_for_del_service.set()
         else:
-            await message.answer("У вас нет сохраненных паролей. Нажмите /set, чтобы зарегистрировать сервис с паролем.")
+            await message.answer("У вас нет сохраненных паролей. Нажмите /set, чтобы записать сервис.")
             await User.waiting_for_command.set()
     except Exception as e:
-        logging.error(f"Ошибка при выполнении функции get_request_password: {e}")
-        await message.answer("Произошла ошибка при выполнении команды /get")
+        logging.error(f"Ошибка при выполнении функции del_request_password: {e}")
+        await message.answer("Произошла ошибка при выполнении команды /del.\nНажмите /help, чтобы узнать способности этого бота")
 
-        
 
 @dp.message_handler(state=User.waiting_for_del_service)
 async def del_password(message: types.Message, state: FSMContext):
