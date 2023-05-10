@@ -25,6 +25,7 @@ conn = psycopg2.connect(
     )
 cursor = conn.cursor()
 
+#Создаем таблицы, где будут храниться все пользователи
 cursor.execute('''
 CREATE TABLE IF NOT EXISTS Users (
     id bigint PRIMARY KEY,
@@ -43,6 +44,7 @@ async def delete_old_records(table: str):
     conn.commit()
 
 
+#Функция для создания таблицы пользователя с его сервисами
 async def create_DB(user):
     cursor.execute(f'''
 CREATE TABLE IF NOT EXISTS {user} (
@@ -56,16 +58,17 @@ CREATE TABLE IF NOT EXISTS {user} (
     ''')
     conn.commit()
 
+#Функция запроса SELECT в таблицу пользователя
 async def select_DB(table, user_id):
     cursor.execute(f'SELECT id, service, login, password FROM {table} WHERE user_id={user_id}')
     return cursor.fetchall()
 
-
+#Функция запроса SELECT в таблицу пользователя
 async def select_service(table, user_id, id):
     cursor.execute(f'SELECT login, password, service FROM {table} WHERE user_id = {user_id} AND id = {id}')
     return cursor.fetchall()
 
-
+#Функция заполнения данных сервиса в таблицу пользователя
 async def insert_service(table, user_id, service, login, password):
     create_date = datetime.datetime.now()
     cursor.execute(f'''
@@ -74,6 +77,7 @@ async def insert_service(table, user_id, service, login, password):
 ''')
     conn.commit()
 
+#Функиця удаления сервиса
 async def drop_service(table, id):
     cursor.execute(f"DELETE FROM {table} WHERE id = '{id}'")
     conn.commit()
@@ -99,11 +103,13 @@ async def start_command(message: types.Message):
     conn.commit()
     await User.waiting_for_command.set()
 
+# help command
 @dp.message_handler(commands=['help'], state=User.waiting_for_command)
 async def help_message(message: types.Message):
     await message.answer('Я могу делать следующее:\n\n/set - добавляет логин и пароль к сервису\n/get - получает логин и пароль по названию сервиса\n/del - удаляет значения для сервиса')
     await User.waiting_for_command.set()
 
+# get command
 @dp.message_handler(commands=['get'], state=User.waiting_for_command)
 async def get_request_password(message: types.Message, state: FSMContext):
     user_name, user_id = message.from_user.username, message.from_user.id
@@ -142,8 +148,7 @@ async def get_password(message: types.Message, state: FSMContext):
         data = await select_service(table, user_id, id)
         if data is not None and len(data) != 0:
             login, password, service = data[0][0], data[0][1], data[0][2]
-            message_id = (await message.answer('Ваш логин и пароль для сервиса {}: \nЛогин: {}\nПароль: {}'.format(
-                    service, login, password))).message_id
+            message_id = (await message.answer(f'Ваш логин и пароль для сервиса {service}: \nЛогин: {login}\nПароль: {password}')).message_id
             message_id_2 = (await message.answer("Сообщение исчезнит через 10 секунд ...")).message_id
             await User.waiting_for_command.set()
             await asyncio.sleep(10)
@@ -209,7 +214,7 @@ async def set_password_password(message: types.Message, state: FSMContext):
         await bot.delete_message(chat_id=user_id, message_id=message_pass)
         await bot.delete_message(chat_id=user_id, message_id=message_login_bot)
         await bot.delete_message(chat_id=user_id, message_id=message_pass_bot)
-        await message.answer('Логин и пароль для сервиса {} успешно сохранены!'.format(user_service))
+        await message.answer(f'Логин и пароль для сервиса {user_service} успешно сохранены!')
 
 
 
@@ -245,7 +250,7 @@ async def del_password(message: types.Message, state: FSMContext):
         id = int(id)
     except Exception as e:
         logger.exception(f"Ошибка от {user_name} - {user_id}")
-        await message.answer("Произошла ошибка при выполнении команды. Попробуйте снова позже.")
+        await message.answer("Произошла ошибка при выполнении команды.\nНажмите /help, чтобы узнать способности этого бота")
     else:
         data = await select_service(f"{user_name}_{user_id}", user_id, id)
         if data is not None and len(data) != 0:
@@ -253,7 +258,7 @@ async def del_password(message: types.Message, state: FSMContext):
             await message.answer(f'Сервис {data[0][2]} успешно удален')
             await User.waiting_for_command.set()
         else:
-            await message.answer("Неверно набран сервис. Нажмите /del чтобы запросить снова")
+            await message.answer("Неверно набран сервис.\nНажмите /help, чтобы узнать способности этого бота")
             await User.waiting_for_command.set()
     finally:
         await User.waiting_for_command.set()
